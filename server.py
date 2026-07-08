@@ -61,6 +61,7 @@ async def broadcast(room_code, message, exclude=None):
 
 async def handler(ws):
     room_code = None
+    print("[server] Nueva conexión entrante", flush=True)
     try:
         async for raw in ws:
             try:
@@ -73,6 +74,7 @@ async def handler(ws):
             if action == "create":
                 room_code = gen_code()
                 ROOMS[room_code] = {ws}
+                print(f"[server] Sala creada: {room_code}", flush=True)
                 await ws.send(json.dumps({"action": "created", "room": room_code}))
 
             elif action == "join":
@@ -80,9 +82,11 @@ async def handler(ws):
                 if code in ROOMS:
                     room_code = code
                     ROOMS[code].add(ws)
+                    print(f"[server] Alguien se unió a la sala {code} (total: {len(ROOMS[code])})", flush=True)
                     await ws.send(json.dumps({"action": "joined", "room": code}))
                     await broadcast(code, {"action": "peer_joined"}, exclude=ws)
                 else:
+                    print(f"[server] Intento de unirse a sala inexistente: {code}", flush=True)
                     await ws.send(json.dumps({
                         "action": "error",
                         "message": "Sala no encontrada. Revisa el código."
@@ -90,9 +94,11 @@ async def handler(ws):
 
             elif action == "scream":
                 if room_code:
+                    print(f"[server] Screamer disparado en sala {room_code}", flush=True)
                     await broadcast(room_code, {"action": "scream"}, exclude=ws)
 
     finally:
+        print("[server] Conexión cerrada", flush=True)
         if room_code and room_code in ROOMS:
             ROOMS[room_code].discard(ws)
             if not ROOMS[room_code]:
@@ -102,7 +108,7 @@ async def handler(ws):
 async def main():
     port = int(os.environ.get("PORT", 8765))  # Render inyecta PORT solo
     async with websockets.serve(handler, "0.0.0.0", port, process_request=health_check):
-        print(f"Servidor relay corriendo en el puerto {port}")
+        print(f"Servidor relay corriendo en el puerto {port}", flush=True)
         await asyncio.Future()  # corre para siempre
 
 
